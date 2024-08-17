@@ -83,6 +83,10 @@ func (s) TestNewFileWatcher(t *testing.T) {
 		refreshDuration time.Duration
 		wantErr         error
 	}{
+		"EmptyPolicyFile": {
+			authzPolicy:     ``,
+			refreshDuration: time.Duration(1),
+		},
 		"InvalidRefreshDurationFailsToCreateInterceptor": {
 			refreshDuration: time.Duration(0),
 			wantErr:         fmt.Errorf("requires refresh interval(0s) greater than 0s"),

@@ -34,12 +34,11 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/internal/grpctest"
+	testgrpc "google.golang.org/grpc/interop/grpc_testing"
+	testpb "google.golang.org/grpc/interop/grpc_testing"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/testdata"
-
-	testgrpc "google.golang.org/grpc/interop/grpc_testing"
-	testpb "google.golang.org/grpc/interop/grpc_testing"
 )
 
 type testServer struct {
@@ -75,6 +74,31 @@ var authzTests = map[string]struct {
 	md          metadata.MD
 	wantStatus  *status.Status
 }{
+	"EmptyPolicyFile": {
+		authzPolicy: ``,
+		md:          metadata.Pairs("key-abc", "val-abc"),
+		wantStatus:  status.New(codes.PermissionDenied, "unauthorized RPC request rejected"),
+	},
+	"AllowAllPolicy": {
+		authzPolicy: `{
+	"name": "Default Authz Policy",
+		"allow_rules": [{
+			"name": "all-access",
+			"source": {
+				"principals": [
+					"*"
+				]
+			},
+			"request": {
+				"paths": [
+					"*"
+				]
+			}
+		}]
+	}`,
+		md:         metadata.Pairs("key-abc", "val-abc"),
+		wantStatus: nil,
+	},
 	"DeniesRPCMatchInDenyNoMatchInAllow": {
 		authzPolicy: `{
 				"name": "authz",
@@ -366,17 +390,21 @@ func (s) TestStaticPolicyEnd2End(t *testing.T) {
 
 func (s) TestAllowsRPCRequestWithPrincipalsFieldOnTLSAuthenticatedConnection(t *testing.T) {
 	authzPolicy := `{
-				"name": "authz",
-				"allow_rules":
-				[
-					{
-						"name": "allow_authenticated",
-						"source": {
-							"principals": ["*", ""]
-						}
-					}
+	"name": "Default Authz Policy",
+		"allow_rules": [{
+			"name": "all-access",
+			"source": {
+				"principals": [
+					"*"
 				]
-			}`
+			},
+			"request": {
+				"paths": [
+					"*"
+				]
+			}
+		}]
+	}`
 	// Start a gRPC server with gRPC authz unary server interceptor.
 	i, _ := authz.NewStatic(authzPolicy)
 	creds, err := credentials.NewServerTLSFromFile(testdata.Path("x509/server1_cert.pem"), testdata.Path("x509/server1_key.pem"))
